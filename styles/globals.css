@@ -282,25 +282,25 @@ textarea:focus-visible {
   @apply text-gray-500 text-sm mt-1;
 }
 
-/* Custom alert styles */
+/* Custom alert styles - PERBAIKAN: Gunakan class Tailwind yang ada */
 .alert {
   @apply p-4 rounded-lg border;
 }
 
 .alert-success {
-  @apply bg-success-50 border-success-200 text-success-700;
+  @apply bg-green-50 border-green-200 text-green-700;
 }
 
 .alert-error {
-  @apply bg-error-50 border-error-200 text-error-700;
+  @apply bg-red-50 border-red-200 text-red-700;
 }
 
 .alert-warning {
-  @apply bg-warning-50 border-warning-200 text-warning-700;
+  @apply bg-yellow-50 border-yellow-200 text-yellow-700;
 }
 
 .alert-info {
-  @apply bg-primary-50 border-primary-200 text-primary-700;
+  @apply bg-blue-50 border-blue-200 text-blue-700;
 }
 
 /* Custom badge styles */
@@ -309,19 +309,19 @@ textarea:focus-visible {
 }
 
 .badge-success {
-  @apply bg-success-100 text-success-800;
+  @apply bg-green-100 text-green-800;
 }
 
 .badge-error {
-  @apply bg-error-100 text-error-800;
+  @apply bg-red-100 text-red-800;
 }
 
 .badge-warning {
-  @apply bg-warning-100 text-warning-800;
+  @apply bg-yellow-100 text-yellow-800;
 }
 
 .badge-info {
-  @apply bg-primary-100 text-primary-800;
+  @apply bg-blue-100 text-blue-800;
 }
 
 /* Custom table styles */
