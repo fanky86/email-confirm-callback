@@ -6,7 +6,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to callback handler if there are query parameters
+    // Auto-redirect to callback if there are query parameters
     if (router.isReady && Object.keys(router.query).length > 0) {
       router.replace({
         pathname: '/callback',
@@ -16,13 +16,6 @@ export default function Home() {
   }, [router.isReady, router.query, router]);
 
   const handleOpenApp = () => {
-    if (config.features.enableAnalytics && window.gtag) {
-      window.gtag('event', 'home_open_app_clicked', {
-        event_category: 'Navigation',
-        event_label: 'Home Page'
-      });
-    }
-    
     window.location.href = `${config.app.scheme}://login-callback/`;
   };
 
@@ -39,39 +32,24 @@ export default function Home() {
           {config.app.name}
         </h1>
         
-        <p className="text-gray-600 mb-6 leading-relaxed">
-          Email Verification Service
+        <p className="text-gray-600 mb-6">
+          Authentication Service
         </p>
         
-        <p className="text-gray-500 text-sm mb-8">
-          This is the email verification service for {config.app.name}.
-          You should access this page through the verification link sent to your email.
+        <p className="text-gray-500 text-sm mb-6">
+          This page handles email verification and OAuth logins for {config.app.name}.
         </p>
         
-        <div className="space-y-3">
-          <button
-            onClick={handleOpenApp}
-            className="btn-primary w-full"
-          >
-            Open {config.app.name}
-          </button>
-          
-          <button
-            onClick={() => window.location.href = '/callback/success?type=signup'}
-            className="btn-secondary w-full"
-          >
-            View Success Demo
-          </button>
-          
-          {config.features.enableSupport && (
-            <a
-              href={`mailto:${config.app.supportEmail}`}
-              className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
-            >
-              Need help? Contact support
-            </a>
-          )}
-        </div>
+        <button
+          onClick={handleOpenApp}
+          className="btn-primary w-full mb-4"
+        >
+          Open {config.app.name}
+        </button>
+        
+        <p className="text-xs text-gray-400">
+          You should access this page through authentication links sent to your email.
+        </p>
       </div>
     </div>
   );
