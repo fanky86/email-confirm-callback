@@ -16,48 +16,44 @@ export default function Callback() {
       const { token, type, error, error_description, code } = router.query;
 
       console.log('🔐 Callback received:', { 
-        token: token ? '***' : 'none', 
+        hasToken: !!token,
         type, 
-        error, 
-        code: code ? '***' : 'none' 
+        hasError: !!error,
+        hasCode: !!code 
       });
 
-      // Handle OAuth callback (Google, GitHub, etc)
+      // Handle error cases first
+      if (error) {
+        console.error('❌ OAuth error:', error, error_description);
+        setMessage(`Authentication failed: ${error_description || error}`);
+        setIsSuccess(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // Handle OAuth callback (Google, GitHub, etc) - FIXED APPROACH
       if (code) {
         try {
-          console.log('🔄 Processing OAuth callback with code...');
+          console.log('🔄 Processing OAuth callback...');
           
-          // Exchange the authorization code for a session
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          // For OAuth, we need to redirect back to app with the code
+          // Let the Flutter app handle the session exchange
+          const deepLinkUrl = `${config.app.scheme}://login-callback?code=${code}&type=oauth`;
+          console.log('🔗 Redirecting to app:', deepLinkUrl);
           
-          if (exchangeError) {
-            throw new Error(`OAuth exchange failed: ${exchangeError.message}`);
-          }
-
-          console.log('✅ OAuth authentication successful');
           setIsSuccess(true);
-          setMessage('Authentication successful! Redirecting to app...');
-
-          // Redirect to app after short delay
-          setTimeout(() => {
-            window.location.href = `${config.app.scheme}://login-callback`;
-          }, 2000);
+          setMessage('OAuth authentication successful! Redirecting to app...');
+          
+          // Redirect to app immediately
+          window.location.href = deepLinkUrl;
           return;
 
         } catch (err) {
-          console.error('❌ OAuth error:', err);
-          setMessage(`OAuth authentication failed: ${err.message}`);
+          console.error('❌ OAuth processing error:', err);
+          setMessage(`OAuth processing failed: ${err.message}`);
           setIsSuccess(false);
           setIsLoading(false);
-          return;
         }
-      }
-
-      // Handle error cases
-      if (error) {
-        setMessage(`Authentication Error: ${error_description || error}`);
-        setIsSuccess(false);
-        setIsLoading(false);
         return;
       }
 
@@ -78,10 +74,8 @@ export default function Callback() {
           setIsSuccess(true);
           setMessage('Email verified successfully! Redirecting to app...');
 
-          // Redirect to app after short delay
-          setTimeout(() => {
-            window.location.href = `${config.app.scheme}://login-callback`;
-          }, 2000);
+          // Redirect to app
+          window.location.href = `${config.app.scheme}://login-callback?type=signup&status=success`;
           return;
           
         } catch (err) {
@@ -107,9 +101,7 @@ export default function Callback() {
           setIsSuccess(true);
           setMessage('Login successful! Redirecting to app...');
 
-          setTimeout(() => {
-            window.location.href = `${config.app.scheme}://login-callback`;
-          }, 2000);
+          window.location.href = `${config.app.scheme}://login-callback?type=magiclink&status=success`;
           return;
           
         } catch (err) {
@@ -135,9 +127,7 @@ export default function Callback() {
           setIsSuccess(true);
           setMessage('Password reset verified! You can now set a new password in the app.');
 
-          setTimeout(() => {
-            window.location.href = `${config.app.scheme}://login-callback`;
-          }, 3000);
+          window.location.href = `${config.app.scheme}://login-callback?type=recovery&status=success`;
           return;
           
         } catch (err) {
@@ -149,7 +139,7 @@ export default function Callback() {
       }
       else {
         console.warn('⚠️ Unhandled callback parameters:', router.query);
-        setMessage('Invalid or unsupported callback parameters.');
+        setMessage('Invalid or unsupported callback parameters. Please try again.');
         setIsSuccess(false);
         setIsLoading(false);
       }
@@ -197,33 +187,20 @@ export default function Callback() {
           {/* Actions */}
           {!isLoading && (
             <div className="space-y-3">
-              {isSuccess ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500">
-                    Redirecting automatically...
-                  </p>
-                  <button
-                    onClick={handleOpenApp}
-                    className="btn-primary w-full"
-                  >
-                    Open App Now
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <button
-                    onClick={handleOpenApp}
-                    className="btn-primary w-full"
-                  >
-                    Try Opening App
-                  </button>
-                  <button
-                    onClick={handleRetry}
-                    className="btn-secondary w-full"
-                  >
-                    Back to Home
-                  </button>
-                </div>
+              <button
+                onClick={handleOpenApp}
+                className="btn-primary w-full"
+              >
+                Open App
+              </button>
+              
+              {!isSuccess && (
+                <button
+                  onClick={handleRetry}
+                  className="btn-secondary w-full"
+                >
+                  Back to Home
+                </button>
               )}
             </div>
           )}
@@ -242,9 +219,13 @@ export default function Callback() {
         {/* Debug Info (Development Only) */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-6 p-4 bg-gray-100 rounded-lg">
-            <p className="text-xs font-mono text-gray-600">
+            <p className="text-xs font-mono text-gray-600 break-all">
               <strong>Debug Info:</strong><br/>
-              Query: {JSON.stringify(router.query, null, 2)}
+              Query: {JSON.stringify(router.query)}<br/>
+              App Scheme: {config.app.scheme}<br/>
+              Has Code: {!!router.query.code}<br/>
+              Has Token: {!!router.query.token}<br/>
+              Type: {router.query.type}
             </p>
           </div>
         )}
