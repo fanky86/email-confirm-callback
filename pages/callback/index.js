@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../../lib/config';
-import LoadingSpinner from '../../components/LoadingSpinner';
 
 const supabase = createClient(config.supabase.url, config.supabase.anonKey);
 
@@ -14,19 +13,58 @@ export default function Callback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const { token, type, error, error_description } = router.query;
+      const { token, type, error, error_description, code } = router.query;
 
-      console.log('Callback received:', { token, type, error });
+      console.log('🔐 Callback received:', { 
+        token: token ? '***' : 'none', 
+        type, 
+        error, 
+        code: code ? '***' : 'none' 
+      });
 
+      // Handle OAuth callback (Google, GitHub, etc)
+      if (code) {
+        try {
+          console.log('🔄 Processing OAuth callback with code...');
+          
+          // Exchange the authorization code for a session
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          
+          if (exchangeError) {
+            throw new Error(`OAuth exchange failed: ${exchangeError.message}`);
+          }
+
+          console.log('✅ OAuth authentication successful');
+          setIsSuccess(true);
+          setMessage('Authentication successful! Redirecting to app...');
+
+          // Redirect to app after short delay
+          setTimeout(() => {
+            window.location.href = `${config.app.scheme}://login-callback`;
+          }, 2000);
+          return;
+
+        } catch (err) {
+          console.error('❌ OAuth error:', err);
+          setMessage(`OAuth authentication failed: ${err.message}`);
+          setIsSuccess(false);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Handle error cases
       if (error) {
-        setMessage(`Error: ${error_description || error}`);
+        setMessage(`Authentication Error: ${error_description || error}`);
         setIsSuccess(false);
         setIsLoading(false);
         return;
       }
 
+      // Handle email verification (Magic Link/OTP)
       if (type === 'signup' && token) {
         try {
+          console.log('📧 Verifying email...');
           const { error: verifyError } = await supabase.auth.verifyOtp({
             token_hash: token,
             type: 'signup'
@@ -36,35 +74,54 @@ export default function Callback() {
             throw new Error(verifyError.message);
           }
 
-          // Track successful verification in analytics
-          if (config.features.enableAnalytics && window.gtag) {
-            window.gtag('event', 'email_verified', {
-              event_category: 'Authentication',
-              event_label: 'Signup'
-            });
-          }
+          console.log('✅ Email verified successfully');
+          setIsSuccess(true);
+          setMessage('Email verified successfully! Redirecting to app...');
 
-          // Success - redirect to success page
-          router.push('/callback/success?type=signup');
+          // Redirect to app after short delay
+          setTimeout(() => {
+            window.location.href = `${config.app.scheme}://login-callback`;
+          }, 2000);
+          return;
           
         } catch (err) {
-          console.error('Verification error:', err);
-          
-          // Track verification failure
-          if (config.features.enableAnalytics && window.gtag) {
-            window.gtag('event', 'email_verification_failed', {
-              event_category: 'Authentication',
-              event_label: err.message
-            });
-          }
-          
+          console.error('❌ Verification error:', err);
           setMessage(`Verification failed: ${err.message}`);
           setIsSuccess(false);
           setIsLoading(false);
         }
       } 
+      else if (type === 'magiclink' && token) {
+        try {
+          console.log('🔗 Processing Magic Link...');
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: 'magiclink'
+          });
+
+          if (verifyError) {
+            throw new Error(verifyError.message);
+          }
+
+          console.log('✅ Magic Link authentication successful');
+          setIsSuccess(true);
+          setMessage('Login successful! Redirecting to app...');
+
+          setTimeout(() => {
+            window.location.href = `${config.app.scheme}://login-callback`;
+          }, 2000);
+          return;
+          
+        } catch (err) {
+          console.error('❌ Magic Link error:', err);
+          setMessage(`Magic Link authentication failed: ${err.message}`);
+          setIsSuccess(false);
+          setIsLoading(false);
+        }
+      }
       else if (type === 'recovery' && token) {
         try {
+          console.log('🔑 Processing password recovery...');
           const { error: verifyError } = await supabase.auth.verifyOtp({
             token_hash: token,
             type: 'recovery'
@@ -74,16 +131,25 @@ export default function Callback() {
             throw new Error(verifyError.message);
           }
 
-          router.push('/callback/success?type=recovery');
+          console.log('✅ Password recovery verified');
+          setIsSuccess(true);
+          setMessage('Password reset verified! You can now set a new password in the app.');
+
+          setTimeout(() => {
+            window.location.href = `${config.app.scheme}://login-callback`;
+          }, 3000);
+          return;
           
         } catch (err) {
+          console.error('❌ Password recovery error:', err);
           setMessage(`Password reset failed: ${err.message}`);
           setIsSuccess(false);
           setIsLoading(false);
         }
       }
       else {
-        setMessage('Invalid or missing parameters');
+        console.warn('⚠️ Unhandled callback parameters:', router.query);
+        setMessage('Invalid or unsupported callback parameters.');
         setIsSuccess(false);
         setIsLoading(false);
       }
@@ -92,64 +158,96 @@ export default function Callback() {
     if (router.isReady) {
       handleCallback();
     }
-  }, [router.isReady, router.query, router]);
+  }, [router.isReady, router.query]);
 
   const handleOpenApp = () => {
-    // Track app open attempt
-    if (config.features.enableAnalytics && window.gtag) {
-      window.gtag('event', 'open_app_clicked', {
-        event_category: 'Navigation',
-        event_label: 'Callback Page'
-      });
-    }
-    
-    window.location.href = `${config.app.scheme}://login-callback/`;
+    window.location.href = `${config.app.scheme}://login-callback`;
+  };
+
+  const handleRetry = () => {
+    window.location.href = '/';
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-xl shadow-soft border border-gray-100 p-8">
         <div className="text-center">
+          {/* Status Icon */}
           <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
             {isLoading ? (
-              <LoadingSpinner size="large" />
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
             ) : isSuccess ? (
-              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             ) : (
-              <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             )}
           </div>
           
+          {/* Message */}
           <h1 className="text-2xl font-bold text-gray-800 mb-3">
-            {isLoading ? 'Processing...' : isSuccess ? 'Success!' : 'Error'}
+            {isLoading ? 'Processing...' : isSuccess ? 'Success!' : 'Authentication Failed'}
           </h1>
           
           <p className="text-gray-600 mb-6 leading-relaxed">{message}</p>
           
-          {!isLoading && !isSuccess && (
+          {/* Actions */}
+          {!isLoading && (
             <div className="space-y-3">
-              <button
-                onClick={handleOpenApp}
-                className="btn-primary w-full"
-              >
-                Try Opening {config.app.name}
-              </button>
-              
-              {config.features.enableSupport && (
-                <a
-                  href={`mailto:${config.app.supportEmail}?subject=Verification Help&body=Hello, I need help with email verification.`}
-                  className="btn-secondary w-full"
-                >
-                  Contact Support
-                </a>
+              {isSuccess ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">
+                    Redirecting automatically...
+                  </p>
+                  <button
+                    onClick={handleOpenApp}
+                    className="btn-primary w-full"
+                  >
+                    Open App Now
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={handleOpenApp}
+                    className="btn-primary w-full"
+                  >
+                    Try Opening App
+                  </button>
+                  <button
+                    onClick={handleRetry}
+                    className="btn-secondary w-full"
+                  >
+                    Back to Home
+                  </button>
+                </div>
               )}
             </div>
           )}
+
+          {/* Loading Progress */}
+          {isLoading && (
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div className="bg-indigo-600 h-1.5 rounded-full animate-pulse"></div>
+              </div>
+              <p className="text-gray-500 text-xs mt-2">Processing authentication...</p>
+            </div>
+          )}
         </div>
+
+        {/* Debug Info (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-6 p-4 bg-gray-100 rounded-lg">
+            <p className="text-xs font-mono text-gray-600">
+              <strong>Debug Info:</strong><br/>
+              Query: {JSON.stringify(router.query, null, 2)}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
